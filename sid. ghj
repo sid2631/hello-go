@@ -1,0 +1,79 @@
+from flask import Flask, jsonify, request, render_template_string
+import psycopg2
+from psycopg2 import OperationalError
+
+app = Flask(__name__)
+
+# Database configuration
+DB_CONFIG = {
+    "dbname": "postgres",
+    "user": "postgres",
+    "password": "postgres",
+    "host": "192.168.16.68",  # Update with your correct AlloyDB host
+    "port": "5432"
+}
+
+# Route to check database connection
+@app.route("/")
+def health_check():
+    return "Hi! Visit /db-status to check the database connection status."
+
+@app.route("/db-status", methods=["GET"])
+def db_status():
+    try:
+        # Attempt to connect to the database
+        connection = psycopg2.connect(**DB_CONFIG)
+        connection.close()
+        return jsonify({"status": "success", "message": "Connected to the database successfully!"})
+    except OperationalError as e:
+        return jsonify({"status": "failure", "message": str(e)}), 500
+
+# Simple UI for running SQL queries
+QUERY_UI_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SQL Query Executor</title>
+</head>
+<body>
+    <h2>Enter SQL Query</h2>
+    <form action="/execute-query" method="post">
+        <textarea name="query" rows="5" cols="50"></textarea><br>
+        <button type="submit">Run Query</button>
+    </form>
+    {% if result %}
+        <h3>Result:</h3>
+        <pre>{{ result }}</pre>
+    {% endif %}
+</body>
+</html>
+"""
+
+@app.route("/query-ui", methods=["GET"])
+def query_ui():
+    return render_template_string(QUERY_UI_TEMPLATE)
+
+@app.route("/execute-query", methods=["POST"])
+def execute_query():
+    query = request.form.get("query")
+    if not query:
+        return render_template_string(QUERY_UI_TEMPLATE, result="No query provided.")
+
+    try:
+        connection = psycopg2.connect(**DB_CONFIG)
+        cursor = connection.cursor()
+        cursor.execute(query)
+        if query.strip().lower().startswith("select"):
+            result = cursor.fetchall()
+        else:
+            connection.commit()
+            result = "Query executed successfully!"
+        cursor.close()
+        connection.close()
+        return render_template_string(QUERY_UI_TEMPLATE, result=str(result))
+    except Exception as e:
+        return render_template_string(QUERY_UI_TEMPLATE, result=str(e))
+
+# Run Flask app
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080)
