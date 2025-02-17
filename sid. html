@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PostgreSQL Query Executor</title>
+</head>
+<body>
+    <h2>Enter SQL Query:</h2>
+    <form method="POST" action="/run-query">
+        <textarea name="query" rows="5" cols="50">{{ query }}</textarea><br>
+        <input type="submit" value="Run Query">
+    </form>
+    <h3>Result:</h3>
+    <pre>{{ result }}</pre>
+</body>
+</html>
