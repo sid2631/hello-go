@@ -121,4 +121,86 @@ def get_template():
 """
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=True)😍
+
+
+
+
+from flask import Flask, request, jsonify, render_template_string
+import psycopg2
+from psycopg2 import OperationalError
+
+app = Flask(__name__)
+
+# Database configuration
+DB_CONFIG = {
+    "dbname": "postgres",
+    "user": "postgres",
+    "password": "postgres",
+    "host": "10.98.15.251",
+    "port": "5432"
+}
+
+# Basic UI Template
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PostgreSQL Query Executor</title>
+</head>
+<body>
+    <h2>Enter SQL Query:</h2>
+    <form method="POST" action="/run-query">
+        <textarea name="query" rows="5" cols="50">SELECT * FROM tep_acct;</textarea><br>
+        <input type="submit" value="Run Query">
+    </form>
+    <h3>Result:</h3>
+    <pre>{{ result }}</pre>
+</body>
+</html>
+"""
+
+@app.route("/")
+def home():
+    return "Hi! Visit /db-status to check the database connection status, or /query-ui to run SQL queries."
+
+@app.route("/db-status", methods=['GET'])
+def db_status():
+    """Check if the database connection is working."""
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        conn.close()
+        return jsonify({"status": "success", "message": "Connected to the database successfully!"})
+    except OperationalError as e:
+        return jsonify({"status": "failure", "message": str(e)}), 500
+
+@app.route("/query-ui", methods=['GET'])
+def query_ui():
+    """Render the UI for running SQL queries."""
+    return render_template_string(HTML_TEMPLATE, result="")
+
+@app.route("/run-query", methods=['POST'])
+def run_query():
+    """Execute SQL query and return results."""
+    query = request.form.get("query")
+    if not query:
+        return render_template_string(HTML_TEMPLATE, result="Error: Query is empty!")
+
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cur = conn.cursor()
+        cur.execute(query)
+        rows = cur.fetchall()
+        colnames = [desc[0] for desc in cur.description]  # Column names
+        cur.close()
+        conn.close()
+
+        # Format result
+        result = "\n".join(["\t".join(map(str, row)) for row in [colnames] + rows])
+        return render_template_string(HTML_TEMPLATE, result=result)
+
+    except Exception as e:
+        return render_template_string(HTML_TEMPLATE, result=f"Error: {str(e)}")
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080, debug=True)
