@@ -1,0 +1,151 @@
+Envoy Proxy Setup with Cloud Run Authentication for HSBC
+
+This document provides step-by-step instructions to set up Envoy Proxy for enabling authentication on Cloud Run URLs. Envoy Proxy acts as an intermediary between clients and Cloud Run services, handling authentication, security, and traffic routing.
+
+
+---
+
+1. Purpose of Envoy Proxy
+
+Envoy Proxy is used to authenticate requests coming to the Cloud Run service. Currently, the Cloud Run URL is not providing authentication, which necessitates using Envoy Proxy to implement authentication.
+
+
+---
+
+2. Setting Up Envoy Proxy VM
+
+To create an Envoy Proxy VM, an Instance Template is required, which has already been set up using the following script:
+
+Envoy Proxy Init Script
+
+
+---
+
+3. Pushing Envoy Image to Artifact Registry
+
+Prerequisites:
+
+Install Docker Desktop from the ServiceNow request link:
+
+
+Docker Desktop Request
+
+
+---
+
+Steps to Push Image
+
+1. Authenticate Docker with Google Cloud:
+
+gcloud auth configure-docker europe-west2-docker.pkg.dev
+
+
+2. Pull the Envoy image from Artifact Registry:
+
+docker pull europe-west2-docker.pkg.dev/hsbc-6320774-fdw-dev/marketplace-ci/envoy.v1.27.0
+
+
+3. Tag the image with your project’s Artifact Registry path:
+
+docker tag europe-west2-docker.pkg.dev/hsbc-6320774-fdw-dev/marketplace-ci/envoy.v1.27.0 \
+europe-west2-docker.pkg.dev/{your_project_id}/tomcat-images/cloudrun-envoy:v1
+
+
+4. Push the tagged image to your project's Artifact Registry:
+
+docker push europe-west2-docker.pkg.dev/{your_project_id}/tomcat-images/cloudrun-envoy:v1
+
+
+
+
+---
+
+4. Install Docker on Proxy VM
+
+Install Docker on the proxy VM and pull the Envoy image from Artifact Registry:
+
+docker pull europe-west2-docker.pkg.dev/{your_project_id}/tomcat-images/cloudrun-envoy:v1
+
+
+---
+
+5. Envoy Configuration Files
+
+Envoy Proxy requires three configuration files:
+
+envoy.yaml: Contains Cloud Run URL and certificate configurations.
+
+ca.crt: Certificate Authority certificate.
+
+ca.key: Certificate Authority private key.
+
+
+
+---
+
+6. Upload Configuration Files to GCS Bucket
+
+Upload the configuration files to Google Cloud Storage (GCS) bucket:
+
+1. Authenticate with Google Cloud:
+
+gcloud auth login
+
+
+2. Upload files to the bucket:
+
+gsutil cp envoy.yaml gs://{your-bucket-name}/envoy.yaml
+gsutil cp ca.crt gs://{your-bucket-name}/ca.crt
+gsutil cp ca.key gs://{your-bucket-name}/ca.key
+
+
+
+
+---
+
+7. Running Envoy Proxy
+
+Run the Envoy Proxy container with the mounted configuration files:
+
+docker run -it --rm -d \
+-p 443:5433 \
+-v /etc/ca.crt:/etc/ssl/certs/ca.crt \
+-v /etc/ca.key:/etc/ca.key \
+-v /etc/envoy.yaml:/etc/envoy/envoy.yaml \
+europe-west2-docker.pkg.dev/{your_project_id}/tomcat-images/cloudrun-envoy:v1
+
+
+---
+
+8. Service Account Permissions
+
+Use the service account:
+
+crenvoy@hsbc-10594356-ihubuk-dev.iam.gserviceaccount.com
+
+Grant Cloud Run Invoker permission to the service account:
+
+gcloud projects add-iam-policy-binding {your_project_id} \
+--member=serviceAccount:crenvoy@hsbc-10594356-ihubuk-dev.iam.gserviceaccount.com \
+--role=roles/run.invoker
+
+
+---
+
+9. DNS Mapping
+
+To enable DNS mapping, raise a request in ServiceNow using the following link:
+
+DNS Mapping Request
+
+Fill in the required fields:
+
+
+---
+
+Summary
+
+By following this guide, you will be able to set up Envoy Proxy to enable authentication on Cloud Run services using GCP infrastructure. If any issues occur, reach out to the HSBC IT support team.
+
+Let me know if you'd like to generate the envoy.yaml configuration template!
+
